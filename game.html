@@ -1,0 +1,218 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Hello World</title>
+    <link rel="shortcut icon" href="#">
+
+    <style>
+        .gameWindow {
+            height: 540px;
+            width: 960px;
+            border: 1px solid black;
+        }
+
+        .gameMenu {
+            width: 100px;
+            padding-bottom: 300px;
+        }
+
+        .start {
+            width: 100%;
+            height: 100%;
+        }
+
+        .score {
+            border: 1px solid black;
+            width: 50%;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <table>
+        <tr>
+            <td>
+                <div id="gameWindow" class="gameWindow"></div>
+            </td>
+            <td>
+                <table class="gameMenu">
+                    <tr>
+                        <td colspan="2"><button class="start" id="start" type="button" onclick="startStop()">Start</button></td>
+                    </tr>
+                    <tr>
+                        <td>Score:</td>
+                        <td id="score" class="score"></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    <script src="pixi.min.js"></script>
+    <script type="text/javascript">
+        class LetterSquare {
+            constructor() {
+                this.letter = ALPHABET[getRandomInt(0, 5)];
+
+                const rectangle = new Graphics();
+                rectangle.beginFill(0xD3D3D3);
+                this.rectSize = getRandomInt(20, 101);
+                const rectPosition = getRandomInt(0, GAMEWIDTH - this.rectSize + 1);
+                rectangle.drawRect(0, 0, this.rectSize, this.rectSize);
+                rectangle.endFill();
+                rectangle.x = rectPosition;
+
+                const size = getRandomInt(15, this.rectSize);
+                const style = new TextStyle({
+                    fontSize: size
+                });
+                const txt = new Text(this.letter.toUpperCase(), style);
+                txt.anchor.set(0.5, 0.5);
+                txt.x = this.rectSize / 2;
+                txt.y = this.rectSize / 2;
+
+                rectangle.addChild(txt);
+                app.stage.addChild(rectangle);
+                this.image = rectangle;
+            }
+            getLetter() {
+                return this.letter;
+            }
+            getSquareSide() {
+                return this.rectSize;
+            }
+            getImage() {
+                return this.image;
+            }
+            pushDown(speed) {
+                this.image.y += speed;
+                return this.image.y;
+            }
+        }
+
+
+        class GameMaster {
+            constructor() {
+                this.letters = [];
+                this.isGameRunning = false;
+                this.score = 0;
+                this.delay = 0;
+            }
+            gameLoop(delta) {
+                if (this.isGameRunning) {
+                    let speed = Math.max(1 + delta + 1 * (this.score / 50) * delta, 1 + delta);
+                    for (const letter of this.letters) {
+                        let location = letter.pushDown(speed);
+                        let deadZone = GAMEHEIGHT - (letter.getSquareSide() / 2)
+                        if (location >= deadZone) {
+                            this.defeat();
+                        }
+                    }
+                    this.delay -= speed;
+                    if (this.delay <= 0) {
+                        this.delay += 40
+                        let spawnNumber = getRandomInt(0, 5)
+                        for (let i = 0; i <= spawnNumber; i++) {
+                            const letter = new LetterSquare();
+                            this.letters.push(letter);
+                        }
+                    }
+                }
+            }
+            keyPress(key) {
+                if (this.isGameRunning && ALPHABET.includes(key)) {
+                    let count = 0;
+                    let newArray = [];
+                    for (const letterSquare of this.letters) {
+                        if (letterSquare.getLetter() == key) {
+                            count += 1;
+                            app.stage.removeChild(letterSquare.image);
+                        } else {
+                            newArray.push(letterSquare);
+                        }
+                    }
+                    if (count >= 2) {
+                        this.score += 1
+                    } else {
+                        this.score -= 2
+                    }
+                    this.letters = newArray;
+                    const scoreBoard = document.getElementById("score");
+                    scoreBoard.innerHTML = this.score;
+                    if (this.score == 50) {
+                        this.victory();
+                    }
+                }
+            }
+            victory() {
+                startStop();
+                const scoreBoard = document.getElementById("score");
+                scoreBoard.innerHTML = "WIN";
+            }
+            defeat() {
+                startStop();
+                const scoreBoard = document.getElementById("score");
+                scoreBoard.innerHTML = "LOSE";
+            }
+            stopGame() {
+                this.isGameRunning = false;
+                while (this.letters.length > 0) {
+                    app.stage.removeChild(this.letters.pop().getImage())
+                }
+            }
+            startGame() {
+                this.score = 0;
+                this.isGameRunning = true;
+            }
+        }
+
+
+        function startStop() {
+            scoreBoard = document.getElementById("score");
+            scoreBoard.innerHTML = "0";
+            button = document.getElementById("start");
+            if (button.innerHTML == "Start") {
+                button.innerHTML = "Stop";
+                gameMaster.startGame();
+            } else {
+                button.innerHTML = "Start";
+                gameMaster.stopGame();
+            }
+        }
+
+
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min) + min);
+        }
+
+
+        const ALPHABET = ["a", "b", "c", "d", "e"];
+        const GAMEHEIGHT = 540;
+        const GAMEWIDTH = 960;
+        const Application = PIXI.Application,
+            loader = PIXI.Loader.shared,
+            resources = PIXI.Loader.shared.resources,
+            Sprite = PIXI.Sprite,
+            Graphics = PIXI.Graphics,
+            Text = PIXI.Text,
+            TextStyle = PIXI.TextStyle;
+        const app = new Application({
+            width: GAMEWIDTH,
+            height: GAMEHEIGHT,
+            antialias: true,
+            transparent: false,
+            resolution: 1,
+            backgroundColor: 0xFFFFFF
+        });
+
+        gameWindow = document.getElementById("gameWindow");
+        gameWindow.appendChild(app.view);
+        const gameMaster = new GameMaster()
+        app.ticker.add((delta) => gameMaster.gameLoop(delta));
+        document.addEventListener("keydown", (event) => {
+            gameMaster.keyPress(event.key);
+        })
+    </script>
+</body></html>
